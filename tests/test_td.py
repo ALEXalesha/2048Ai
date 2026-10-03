@@ -17,7 +17,7 @@ def test_short_training_beats_random_play_by_far():
     trainer.run(games=1500)
     assert trainer.games_done >= 1500
     trained = bots.summary(bots.play(bots.greedy_policy(net), 100, seed=500))
-    rand = bots.summary(bots.play(bots.random_policy(np.random.default_rng(0)), 100, seed=500))
+    rand = bots.summary(bots.play(bots.random_policy(0), 100, seed=500))
     corner = bots.summary(bots.play(bots.corner_policy(), 100, seed=500))
     # Замер: после 1500 партий ~16 тысяч очков против ~1 тысячи у случайных ходов и ~2.4
     # тысячи у «больших в угол». Сеть без оценки будущего (только очки хода) - ~3 тысячи.

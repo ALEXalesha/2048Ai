@@ -12,11 +12,25 @@ import numpy as np
 from game.core import game2048 as g
 
 
-def random_policy(rng):
-    """Случайный разрешённый ход."""
+def _mix(x):
+    """splitmix64: из числа - «случайное» число, всегда одно и то же."""
+    x = (x + np.uint64(0x9E3779B97F4A7C15))
+    x = (x ^ (x >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+    x = (x ^ (x >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+    return x ^ (x >> np.uint64(31))
+
+
+def random_policy(seed=0):
+    """Случайный разрешённый ход. Выбор зависит только от поля и зерна (хеш), а не от
+    того, какие ещё партии идут в пачке: партия i играется одинаково при любой пачке -
+    так паспорт пересчитывается на малой выборке."""
+    salt = np.uint64(int(seed) & 0xFFFFFFFFFFFFFFFF)
+
     def policy(boards):
         _, _, legal = g.all_moves(boards)
-        noise = rng.random(legal.shape)
+        keys = _mix(np.asarray(boards, dtype=np.uint64)[:, None] ^ salt
+                    ^ (np.arange(4, dtype=np.uint64)[None, :] * np.uint64(0x632BE59BD9B4E019)))
+        noise = (keys >> np.uint64(11)).astype(np.float64)
         noise[~legal] = -1.0
         return noise.argmax(axis=1)
     policy.name = "random"

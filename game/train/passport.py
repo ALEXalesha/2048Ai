@@ -25,7 +25,7 @@ SAMPLE = {"random": 50, "corner": 50, "novice": 20, "medium": 20, "strong": 3}
 
 
 def players(brain):
-    out = {"random": lambda: bots.random_policy(np.random.default_rng(SEED)),
+    out = {"random": lambda: bots.random_policy(SEED),
            "corner": bots.corner_policy}
     for level in levels.LEVELS:
         out[level] = (lambda lv=level: levels.policy(brain, lv))

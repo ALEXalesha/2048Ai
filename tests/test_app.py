@@ -400,3 +400,16 @@ def test_ai_is_honest_it_sees_only_the_board(widget, qapp):
     grid = [[2, 2, 0, 4], [0, 4, 0, 0], [0, 0, 8, 0], [2, 0, 0, 0]]
     answers = {worker._compute({"grid": grid, "level": "strong"})["move"] for _ in range(3)}
     assert len(answers) == 1
+
+
+def test_statistics_page_has_no_stale_labels_after_language_switch(widget, ctx, qapp):
+    from PySide6.QtWidgets import QLabel
+    widget.show_page("stats")
+    ctx.set_lang("en")
+    ctx.set_lang("ru")
+    widget.refresh_stats()
+    qapp.processEvents()
+    box = widget.stats_grid.parentWidget()
+    texts = [lab.text() for lab in box.findChildren(QLabel) if lab.isVisibleTo(box)]
+    assert "Games" not in texts and texts.count("Партий") == 1
+    assert len(texts) == widget.stats_grid.count()

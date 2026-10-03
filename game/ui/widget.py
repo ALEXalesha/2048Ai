@@ -761,8 +761,13 @@ class GameWidget(QWidget):
         self.stats_size.setText(t("stats_size", size=self.size))
         while self.stats_grid.count():
             item = self.stats_grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget()
+            if w:
+                # Спрятать сразу: deleteLater удалит лишь в следующем цикле событий, и до
+                # этого старые подписи рисовались бы поверх новых.
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
         me, ai = self.records.get("me", self.size), self.records.get("ai", self.size)
         self.stats_grid.addWidget(label("", "muted"), 0, 0)
         self.stats_grid.addWidget(label(t("you"), "section"), 0, 1)

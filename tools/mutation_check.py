@@ -139,6 +139,8 @@ GROUPS = {
              "подпись с переносом фиксированной высоты"),
             ("game/ui/widget.py", "        if self.size != 4:\n            notes.append",
              "        if False:\n            notes.append", "о необученном размере молчит"),
+            ("game/ui/widget.py", "                w.hide()\n                w.setParent(None)\n", "",
+             "старые подписи статистики остаются поверх новых"),
             ("game/core/session.py",
              ["        if self.undo_allowed:\n            self.history.append(snap)",
               "return self.undo_allowed and bool(self.history)"],
