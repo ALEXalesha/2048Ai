@@ -72,6 +72,26 @@ GROUPS = {
              "TD-ошибка с неверным знаком"),
         ],
     },
+    "expectimax": {
+        "tests": ["tests/test_expectimax.py"],
+        "mutations": [
+            ("game/ai/expectimax.py", "weight = np.concatenate([TWO_P * p, FOUR_P * p])",
+             "weight = np.concatenate([FOUR_P * p, TWO_P * p])", "вероятности 2 и 4 перепутаны"),
+            ("game/ai/expectimax.py", "best[~np.isfinite(best)] = 0.0", "best[~np.isfinite(best)] = 1e6",
+             "конец партии стоит не ноль"),
+            ("game/ai/expectimax.py", "    p = 1.0 / cnt[rows]\n", "    p = 1.0 + 0 * cnt[rows]\n",
+             "пустые клетки не усредняются"),
+            ("game/ai/expectimax.py", "v = chance_values(net, afters, depth - 1, chunk)",
+             "v = chance_values(net, afters, max(1, depth - 2), chunk)", "глубина считается неверно"),
+            ("game/ai/expectimax.py", "vals.ravel()[flat_legal] = reward.ravel()[flat_legal] + v",
+             "vals.ravel()[flat_legal] = v", "очки за ход забыты"),
+            ("game/ai/expectimax.py", "if depth > 1 and elapsed + last * branching > time_limit:",
+             "if False:", "лимит времени не соблюдается"),
+            ("game/ai/expectimax.py",
+             "weights=weight * best, minlength=part.shape[0])",
+             "weights=weight * best, minlength=part.shape[0])[::-1]", "куски путают родителей"),
+        ],
+    },
 }
 
 
