@@ -24,12 +24,14 @@ MAIN_MODEL = "net.npz"
 NOVICE_MODEL = "novice.npz"
 PASSPORT = "passport.json"
 
-# Настройки уровней. strong_depth - глубина поиска; на тесном поле (пустых клеток не больше
-# deep_below) сильный уровень смотрит на ход дальше. Те же числа - в паспорте.
+# Настройки уровней. depth - глубина поиска в своих ходах; adaptive - на тесном поле (пустых
+# клеток не больше deep_below) смотреть на ход дальше: там ветвей мало, а опасность близко.
+# Замер на 100 партиях: глубина 2 - 8192 в 38 %, с углублением - в 63 %, но в 19 раз
+# дольше. Те же числа - в паспорте.
 LEVEL_SETTINGS = {
     "novice": {"model": NOVICE_MODEL, "depth": 1, "adaptive": False},
     "medium": {"model": MAIN_MODEL, "depth": 1, "adaptive": False},
-    "strong": {"model": MAIN_MODEL, "depth": 2, "adaptive": False},
+    "strong": {"model": MAIN_MODEL, "depth": 2, "adaptive": True, "deep_below": 4},
 }
 
 
@@ -82,7 +84,8 @@ class Brain:
         s = LEVEL_SETTINGS[level]
         d = depth or s["depth"]
         if s["adaptive"] and depth is None:
-            d = int(expectimax.adaptive_depth(np.array([board], dtype=np.uint64), base=d)[0])
+            d = int(expectimax.adaptive_depth(np.array([board], dtype=np.uint64), base=d,
+                                              deep_below=s.get("deep_below", 4))[0])
         net = self.net(level)
         if time_limit is not None:
             res = expectimax.search(net, board, max_depth=d, time_limit=time_limit)
@@ -100,4 +103,4 @@ class Brain:
 def policy(brain, level):
     """Стратегия уровня для прогона партий пачкой (паспорт, тесты)."""
     s = LEVEL_SETTINGS[level]
-    return expectimax.policy(brain.net(level), s["depth"], s["adaptive"])
+    return expectimax.policy(brain.net(level), s["depth"], s["adaptive"], s.get("deep_below", 4))

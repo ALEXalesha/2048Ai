@@ -72,3 +72,10 @@ def test_random_bot_plays_legal_moves_and_does_not_depend_on_the_batch():
     assert (a["score"] == b["score"]).all()
     s = bots.summary(bots.play(rnd, 200, seed=1))
     assert 600 < s["avg_score"] < 2500          # случайные ходы: около тысячи очков
+
+
+def test_parallel_passport_gives_the_same_games_as_one_process():
+    one = bots.play(bots.corner_policy(), 6, pp.SEED)
+    many = pp.play_parallel("corner", 6, processes=2, echo=None)
+    for k in ("score", "max_exp", "moves"):
+        assert (np.asarray(one[k]) == np.asarray(many[k])).all()

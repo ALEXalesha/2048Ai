@@ -21,7 +21,38 @@ from game.ai import bots, levels
 from game.ai.levels import LEVEL_SETTINGS, Brain
 
 SEED = 20261003
-SAMPLE = {"random": 50, "corner": 50, "novice": 20, "medium": 20, "strong": 3}
+SAMPLE = {"random": 50, "corner": 50, "novice": 20, "medium": 20, "strong": 2}
+# Сильный уровень с поиском в 19 раз медленнее сети без поиска: его партии делятся между
+# несколькими процессами, каждый в один поток и с пониженным приоритетом.
+HEAVY = ("strong",)
+
+
+def _chunk(job):
+    """Партии [lo, hi) одного игрока в отдельном процессе. Зерно партии - SEED + её номер,
+    как и в общем прогоне, поэтому куски складываются в тот же результат."""
+    name, lo, hi = job
+    from game.train.td import limit_threads, lower_priority
+    limit_threads(1)
+    lower_priority()
+    policy = players(Brain())[name]()
+    res = bots.play(policy, hi - lo, SEED + lo)
+    return lo, res
+
+
+def play_parallel(name, games, processes, echo=print):
+    from concurrent.futures import ProcessPoolExecutor
+    size = max(1, -(-games // (processes * 4)))
+    jobs = [(name, lo, min(games, lo + size)) for lo in range(0, games, size)]
+    parts = {}
+    with ProcessPoolExecutor(max_workers=processes) as pool:
+        for lo, res in pool.map(_chunk, jobs):
+            parts[lo] = res
+            if echo:
+                echo(f"  {name}: готово {sum(len(r['score']) for r in parts.values())} из {games}")
+    keys = sorted(parts)
+    out = {k: np.concatenate([parts[lo][k] for lo in keys]) for k in ("score", "max_exp", "moves")}
+    out["seconds"] = sum(parts[lo]["seconds"] for lo in keys)
+    return out
 
 
 def players(brain):
@@ -32,7 +63,7 @@ def players(brain):
     return out
 
 
-def evaluate(name, policy, games, echo=print):
+def evaluate(name, policy, games, echo=print, processes=1):
     started = time.time()
     last = [0.0]
 
@@ -41,9 +72,13 @@ def evaluate(name, policy, games, echo=print):
             last[0] = time.time()
             echo(f"  {name}: партии {lo}-{hi}, идут {alive}, ход {steps}, {time.time() - started:.0f} с")
 
-    res = bots.play(policy, games, SEED, progress=progress)
+    if processes > 1 and name in HEAVY:
+        res = play_parallel(name, games, processes, echo)
+    else:
+        res = bots.play(policy, games, SEED, progress=progress)
     s = bots.summary(res)
     s["seconds"] = round(time.time() - started, 1)
+    s["processes"] = processes if name in HEAVY else 1
     s["seed"] = SEED
     s["first_scores"] = [int(x) for x in res["score"][:SAMPLE.get(name, 10)]]
     s["max_tile_counts"] = {str(1 << int(e)): int((res["max_exp"] == e).sum())
@@ -62,7 +97,7 @@ def training_info(run_dir):
     }
 
 
-def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None):
+def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None, processes=1):
     passport = {}
     if os.path.exists(out_path):
         with open(out_path, encoding="utf-8") as f:
@@ -83,7 +118,7 @@ def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None)
         if name in passport["results"]:
             continue
         echo(f"{name}: {games} партий...")
-        passport["results"][name] = evaluate(name, make(), games, echo)
+        passport["results"][name] = evaluate(name, make(), games, echo, processes)
         r = passport["results"][name]
         echo(f"{name}: средний {r['avg_score']:.0f}, 2048 {100 * r['reached']['2048']:.1f}%, "
              f"{r['seconds']:.0f} с")

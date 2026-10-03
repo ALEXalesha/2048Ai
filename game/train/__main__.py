@@ -111,7 +111,7 @@ def _passport(args):
         extra["novice_snapshot_games"] = args.novice_games
     only = [x for x in args.only.split(",") if x] if args.only else None
     p = passport.build(out, args.run, args.games, only=only, extra=extra,
-                       echo=lambda s: print(s, flush=True))
+                       echo=lambda s: print(s, flush=True), processes=args.processes)
     print(json.dumps({k: {"avg": v["avg_score"], "2048": v["reached"]["2048"]}
                       for k, v in p["results"].items()}, ensure_ascii=False))
     return 0
@@ -155,6 +155,7 @@ def main(argv=None):
     pp.add_argument("--out", default=None)
     pp.add_argument("--only", default="", help="через запятую: random,corner,novice,medium,strong")
     pp.add_argument("--novice-games", type=int, default=0, help="после скольких партий снят ранний снимок")
+    pp.add_argument("--processes", type=int, default=4, help="процессов для сильного уровня")
 
     args = ap.parse_args(argv)
     args.alpha_set = any(a.startswith("--alpha") for a in (argv if argv is not None else sys.argv[1:]))

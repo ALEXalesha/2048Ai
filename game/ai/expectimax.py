@@ -89,12 +89,12 @@ def adaptive_depth(boards, base=2, deep_below=4, max_depth=3):
     return np.where(empty <= deep_below, np.minimum(base + 1, max_depth), base)
 
 
-def policy(net, depth=2, adaptive=False):
+def policy(net, depth=2, adaptive=False, deep_below=4):
     """Стратегия для bots.play: ход по поиску заданной глубины."""
     def choose(boards):
         if not adaptive:
             return action_values(net, boards, depth).argmax(axis=1)
-        d = adaptive_depth(boards, base=depth)
+        d = adaptive_depth(boards, base=depth, deep_below=deep_below)
         out = np.zeros(boards.shape[0], dtype=np.int64)
         for dd in np.unique(d):
             m = d == dd
