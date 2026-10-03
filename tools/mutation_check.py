@@ -48,6 +48,30 @@ GROUPS = {
              "образец: другой порядок случайных чисел"),
         ],
     },
+    "ntuple": {
+        "tests": ["tests/test_ntuple.py", "tests/test_td.py"],
+        "mutations": [
+            ("game/ai/ntuple.py", "return (((b & U(0x000F000F000F000F)) << U(12))",
+             "return (((b & U(0x000F000F000F000F)) << U(8))", "отражение портит клетки"),
+            ("game/ai/ntuple.py", "flip_v(h), t, th, tv, flip_v(th)])", "flip_v(h), t, th, tv, th])",
+             "одна симметрия повторена вместо восьмой"),
+            ("game/ai/ntuple.py", "cells[k + 1] == cells[k] + 1", "cells[k + 1] >= cells[k] + 1",
+             "клетки не подряд считаются подряд"),
+            ("game/ai/ntuple.py", "(lr * total / count)", "(lr * total)",
+             "ошибки частых весов складываются, а не усредняются"),
+            ("game/ai/ntuple.py", "scale = peak / 32767.0 if", "scale = peak / 255.0 if",
+             "квантование переполняет int16"),
+            ("game/train/td.py", "target = np.where(dead, 0.0, q[idx, a])",
+             "target = np.where(dead, 0.0, reward[idx, a])", "TD без оценки следующей позиции"),
+            ("game/train/td.py", "            prev = feats[idx, a]\n", "            prev = feats[idx, 0]\n",
+             "учится не та позиция после хода"),
+            ("game/train/td.py", "        tr.games_done = state[\"games_done\"]\n", "",
+             "продолжение начинает счёт партий с нуля"),
+            ("game/train/td.py", "    delta = np.asarray(target, dtype=np.float64) - net.value_of_features(feats)",
+             "    delta = np.asarray(target, dtype=np.float64) + net.value_of_features(feats)",
+             "TD-ошибка с неверным знаком"),
+        ],
+    },
 }
 
 

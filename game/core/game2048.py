@@ -191,6 +191,13 @@ def spawn(boards, rng):
     n = boards.shape[0]
     u_pos = rng.random(n)
     u_val = rng.random(n)
+    return spawn_with(boards, u_pos, u_val)
+
+
+def spawn_with(boards, u_pos, u_val):
+    """То же, но случайные числа даны готовыми: u_pos выбирает пустую клетку, u_val -
+    значение (меньше 0.1 - четвёрка)."""
+    boards = np.asarray(boards, dtype=np.uint64)
     empty = cells(boards) == 0
     cnt = empty.sum(axis=1)
     k = np.floor(u_pos * cnt).astype(np.int64)
