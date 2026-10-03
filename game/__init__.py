@@ -5,6 +5,9 @@ main.py через aikit.run_standalone, оболочка Игротеки вс�
 """
 from game.version import VERSION
 
+# Имя программы: папка данных %APPDATA%\2048Ai, переменная 2048AI_HOME подменяет её.
+APP_NAME = "2048Ai"
+
 GAME_INFO = {
     "id": "game2048",
     "title": {"ru": "2048", "en": "2048"},

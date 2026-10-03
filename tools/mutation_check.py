@@ -92,6 +92,60 @@ GROUPS = {
              "weights=weight * best, minlength=part.shape[0])[::-1]", "куски путают родителей"),
         ],
     },
+    "window": {
+        "tests": ["tests/test_app.py", "tests/test_session.py"],
+        "mutations": [
+            ("game/ui/widget.py", "self.btn_undo.setVisible(mode == \"play\")", "self.btn_undo.setVisible(True)",
+             "отмена хода видна во всех режимах"),
+            ("game/ui/widget.py", "Session(size, seed=seed), Session(size, seed=seed)",
+             "Session(size, seed=seed), Session(size)", "у соревнования разные зёрна"),
+            ("game/ui/widget.py",
+             ["        if self.paused:\n            self.ai_timer.stop()\n",
+              "or self.runner.busy() or self.paused:",
+              "elif self.mode == \"ai\" and not self.paused:",
+              "if self.mode == \"ai\" and not self.paused and self.ai and not self.ai.over():"],
+             ["        if self.paused:\n            pass\n",
+              "or self.runner.busy():",
+              "elif self.mode == \"ai\":",
+              "if self.mode == \"ai\" and self.ai and not self.ai.over():"],
+             "пауза не останавливает ИИ"),
+            ("game/ui/widget.py", "        self.paused = not self.paused\n", "        self.paused = False\n",
+             "кнопка паузы не ставит на паузу"),
+            ("game/ui/widget.py", "        self.stepping = True\n        self._ask_ai_move()\n",
+             "        self.stepping = True\n", "шаг ничего не делает"),
+            ("game/ui/widget.py", "if self.size == 4 and self.runner.brain.available(self.level):", "if True:",
+             "«большие в угол» записываются как ИИ"),
+            ("game/ui/widget.py", "        return self.runner.stop(2000)", "        return True",
+             "закрытие не останавливает поток ИИ"),
+            ("game/ui/widget.py", "            self.tr.lang = self.ctx.lang\n", "",
+             "смена языка не переводит"),
+            ("game/ui/widget.py", "            b.set_theme(self.ctx.theme)", "            pass",
+             "смена темы не перекрашивает поле"),
+            ("game/ui/widget.py", "                self.me_board.set_hint(result[\"move\"])",
+             "                self.me_board.set_hint(None)", "подсказка без стрелки"),
+            ("game/ui/board.py", "return 1 if dx > 0 else 3", "return 3 if dx > 0 else 1",
+             "смахивание в обратную сторону"),
+            ("game/ui/widget.py", "Qt.Key.Key_Left: 3, Qt.Key.Key_A: 3", "Qt.Key.Key_Left: 1, Qt.Key.Key_A: 3",
+             "стрелка влево двигает вправо"),
+            ("game/ui/widget.py",
+             "            if self.ai is not None and not self.ai.over():\n                self._ask_ai_move()\n",
+             "            if self.ai is not None and not self.ai.over():\n                pass\n",
+             "в соревновании ИИ не отвечает на ход"),
+            ("game/ui/widget.py",
+             "        result = \"win\" if me > ai else (\"loss\" if me < ai else \"draw\")\n        self.ctx.stats",
+             "        result = \"loss\" if me > ai else (\"win\" if me < ai else \"draw\")\n        self.ctx.stats",
+             "итог соревнования наоборот"),
+            ("game/ui/widget.py", "self.status.setMinimumHeight(28)", "self.status.setFixedHeight(28)",
+             "подпись с переносом фиксированной высоты"),
+            ("game/ui/widget.py", "        if self.size != 4:\n            notes.append",
+             "        if False:\n            notes.append", "о необученном размере молчит"),
+            ("game/core/session.py",
+             ["        if self.undo_allowed:\n            self.history.append(snap)",
+              "return self.undo_allowed and bool(self.history)"],
+             ["        if True:\n            self.history.append(snap)", "return bool(self.history)"],
+             "отмена там, где её нет"),
+        ],
+    },
 }
 
 
@@ -119,16 +173,25 @@ def check(group):
         with open(full, "rb") as f:
             original = f.read()
         text = original.decode("utf-8")
+        # Одна мутация может быть несколькими заменами (списки old/new): где защита стоит
+        # в двух местах, убрать одну - значит ничего не сломать.
+        olds = old if isinstance(old, list) else [old]
+        news = new if isinstance(new, list) else [new]
         if "\r\n" in text:                    # файл с концами строк Windows
-            old, new = old.replace("\n", "\r\n"), new.replace("\n", "\r\n")
-        if text.count(old) != 1:
-            print(f"   !! мутация «{what}»: строка найдена {text.count(old)} раз, пропуск")
+            olds = [o.replace("\n", "\r\n") for o in olds]
+            news = [n.replace("\n", "\r\n") for n in news]
+        bad = [o for o in olds if text.count(o) != 1]
+        if bad:
+            print(f"   !! мутация «{what}»: строка найдена {text.count(bad[0])} раз, пропуск")
             survived.append((what, "строка не найдена"))
             continue
+        mutated = text
+        for o, n in zip(olds, news):
+            mutated = mutated.replace(o, n)
         started = time.time()
         try:
             with open(full, "wb") as f:
-                f.write(text.replace(old, new).encode("utf-8"))
+                f.write(mutated.encode("utf-8"))
             code = run_tests(spec["tests"])
         finally:
             with open(full, "wb") as f:

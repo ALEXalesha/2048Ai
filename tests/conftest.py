@@ -8,10 +8,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest  # noqa: E402
 
-import offscreen  # noqa: E402
+from aikit import offscreen  # noqa: E402
 
 # Без экрана: Qt рисует в память. Ставится до любого импорта Qt.
 offscreen.setup()
+
+# Папка данных подменяется целиком (aikit.pick_data_root: <ПРОГРАММА>_HOME).
+HOME_VAR = "2048AI_HOME"
 
 
 @pytest.fixture(autouse=True)
@@ -19,11 +22,12 @@ def _own_data_dir(tmp_path, monkeypatch):
     """Каждый тест пишет настройки, статистику и место окна в свою временную папку,
     а не в профиль игрока."""
     home = tmp_path / "home"
-    monkeypatch.setenv("AI2048_HOME", str(home))
+    monkeypatch.setenv(HOME_VAR, str(home))
     return home
 
 
 _app = None
+
 
 
 @pytest.fixture

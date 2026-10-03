@@ -97,6 +97,26 @@ def _export(args):
     return 0
 
 
+def _passport(args):
+    import json
+
+    from game.ai import levels
+    from game.train import passport
+
+    out = args.out or os.path.join(os.path.dirname(os.path.abspath(levels.__file__)), "..", "models",
+                                   levels.PASSPORT)
+    out = os.path.abspath(out)
+    extra = {}
+    if args.novice_games:
+        extra["novice_snapshot_games"] = args.novice_games
+    only = [x for x in args.only.split(",") if x] if args.only else None
+    p = passport.build(out, args.run, args.games, only=only, extra=extra,
+                       echo=lambda s: print(s, flush=True))
+    print(json.dumps({k: {"avg": v["avg_score"], "2048": v["reached"]["2048"]}
+                      for k, v in p["results"].items()}, ensure_ascii=False))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m game.train", description="Обучение n-tuple сети 2048")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -129,11 +149,19 @@ def main(argv=None):
     e.add_argument("--snapshot", default="latest")
     e.add_argument("--out", required=True)
 
+    pp = sub.add_parser("passport", help="проверки силы: по 1000 партий на уровень")
+    pp.add_argument("--run", default=None, help="папка обучения - сведения об обучении")
+    pp.add_argument("--games", type=int, default=1000)
+    pp.add_argument("--out", default=None)
+    pp.add_argument("--only", default="", help="через запятую: random,corner,novice,medium,strong")
+    pp.add_argument("--novice-games", type=int, default=0, help="после скольких партий снят ранний снимок")
+
     args = ap.parse_args(argv)
     args.alpha_set = any(a.startswith("--alpha") for a in (argv if argv is not None else sys.argv[1:]))
     from game.train.td import lower_priority
     lower_priority()
-    return {"trial": _trial, "train": _train, "export": _export}[args.cmd](args)
+    return {"trial": _trial, "train": _train, "export": _export,
+            "passport": _passport}[args.cmd](args)
 
 
 if __name__ == "__main__":
