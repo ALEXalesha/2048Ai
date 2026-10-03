@@ -384,3 +384,19 @@ def test_selftest_runs_in_a_separate_process(tmp_path):
     text = out.read_text(encoding="utf-8")
     assert proc.returncode == 0, text
     assert "ИТОГ: работает" in text
+
+
+def test_ai_is_honest_it_sees_only_the_board(widget, qapp):
+    """Закон честности: ИИ получает только поле - не зерно и не генератор случайности,
+    поэтому будущие плитки ему неизвестны. Одно поле при разных зёрнах - один ход."""
+    jobs = []
+    widget.runner.request.connect(lambda token, job: jobs.append(job))
+    widget.start_mode("ai")
+    assert wait_until(qapp, lambda: len(jobs) >= 2)
+    for job in jobs:
+        assert set(job) <= {"gen", "purpose", "grid", "level", "depth", "time_limit"}
+    from game.ui.ai_runner import Worker
+    worker = Worker(FakeBrain())
+    grid = [[2, 2, 0, 4], [0, 4, 0, 0], [0, 0, 8, 0], [2, 0, 0, 0]]
+    answers = {worker._compute({"grid": grid, "level": "strong"})["move"] for _ in range(3)}
+    assert len(answers) == 1
