@@ -1,0 +1,44 @@
+# Проверки на каждый пуш.
+#
+# Раннер windows: окно проверяется без экрана (Qt offscreen), а тексту на кадрах нужны
+# шрифты - offscreen берёт их из папки шрифтов Windows (offscreen.py). На linux их нет,
+# и проверки кадров начали бы падать не из-за кода.
+#
+# Потоков BLAS немного: n-tuple сеть - это таблицы, им хватает одного-двух.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Проверки
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Зависимости
+        run: pip install -r requirements-dev.txt
+
+      - name: Тесты
+        run: python -m pytest -q
+
+      - name: Самопроверка без экрана
+        run: |
+          python main.py --selftest selftest.txt
+          Get-Content selftest.txt

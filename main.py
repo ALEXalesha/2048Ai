@@ -1,0 +1,69 @@
+"""2048 и ИИ, который сам научился в неё играть.
+
+    python main.py                         # игра
+    python main.py --selftest итог.txt     # самопроверка без экрана
+    python main.py --offscreen             # окно без экрана (для проверок)
+
+Самопроверка нужна прежде всего собранному exe: он без консоли, поэтому итог пишется в
+файл. Данные игрока - во временной папке, его статистику она не трогает.
+"""
+import argparse
+import os
+import sys
+import tempfile
+import time
+import traceback
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+def selftest(out_path):
+    lines = []
+    code = 0
+    try:
+        import offscreen
+        offscreen.setup(force=True)
+        os.environ["AI2048_HOME"] = tempfile.mkdtemp(prefix="ai2048-selftest-")
+        import numpy as np
+
+        from game.core import game2048 as g
+        from game.version import VERSION
+
+        lines.append(f"2048Ai {VERSION} самопроверка")
+        lines.append(f"собранная версия: {'да' if getattr(sys, 'frozen', False) else 'нет'}")
+        started = time.time()
+        rng = np.random.default_rng(7)
+        boards, scores, alive = g.new_games(64, rng)
+        while alive.any():
+            moves = rng.integers(0, 4, size=boards.shape[0])
+            boards, scores, alive = g.play_step(boards, scores, alive, moves, rng)
+        lines.append(f"правила: 64 случайные партии, средний счёт {scores.mean():.0f}, "
+                     f"{time.time() - started:.2f} с")
+        lines.append("ИТОГ: работает")
+    except Exception:  # noqa: BLE001 - любая ошибка должна попасть в файл
+        lines.append("ИТОГ: ошибка")
+        lines.append(traceback.format_exc())
+        code = 1
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return code
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="2048 и ИИ")
+    ap.add_argument("--selftest", metavar="ФАЙЛ", nargs="?", const="selftest.txt",
+                    help="без окна проверить правила и ИИ и записать итог в файл")
+    ap.add_argument("--offscreen", action="store_true", help="окно без экрана")
+    args = ap.parse_args(argv)
+    if args.selftest:
+        return selftest(args.selftest)
+    if args.offscreen:
+        import offscreen
+        offscreen.setup(force=True)
+    import aikit
+    from game import GAME_INFO, create_widget
+    return aikit.run_standalone(GAME_INFO, create_widget)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

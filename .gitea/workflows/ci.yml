@@ -1,0 +1,51 @@
+# Проверки на домашнем Gitea. Копия .github/workflows/ci.yml, отличие одно: задачи
+# идут на раннер ПК (метка windows), а не на windows-latest - такая метка есть только у
+# раннера ноутбука, и без него задачи висели бы в очереди и отменялись.
+# Раз папка .gitea/workflows есть, Gitea берёт проверки только отсюда: выпуски - дело
+# GitHub, здесь их нет. Меняя проверки, править оба файла.
+
+# Проверки на каждый пуш.
+#
+# Раннер windows: окно проверяется без экрана (Qt offscreen), а тексту на кадрах нужны
+# шрифты - offscreen берёт их из папки шрифтов Windows (offscreen.py). На linux их нет,
+# и проверки кадров начали бы падать не из-за кода.
+#
+# Потоков BLAS немного: n-tuple сеть - это таблицы, им хватает одного-двух.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Проверки
+    runs-on: windows
+    timeout-minutes: 20
+    env:
+      OPENBLAS_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python ПК (3.13) в своём окружении, а не setup-python: тот ставит Python
+      # установщиком, которому нужны права администратора на реестр, - у раннера их нет.
+      - name: Python в отдельном окружении
+        run: |
+          py -3.13 -m venv .ci-venv
+          [IO.File]::AppendAllText($env:GITHUB_PATH, "$((Resolve-Path .ci-venv).Path)\Scripts`n")
+
+      - name: Зависимости
+        run: pip install -r requirements-dev.txt
+
+      - name: Тесты
+        run: python -m pytest -q
+
+      - name: Самопроверка без экрана
+        run: |
+          python main.py --selftest selftest.txt
+          Get-Content selftest.txt
