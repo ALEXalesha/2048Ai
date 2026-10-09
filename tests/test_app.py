@@ -235,13 +235,16 @@ def test_pause_stops_and_step_makes_exactly_one_move(widget, qapp):
 
 def test_speed_changes_the_pace(widget, qapp):
     widget.start_mode("ai")
+    # «Медленно» - не меньше 0.74 с на ход (анимация + пауза): за 1.5 с не больше трёх ходов,
+    # как бы ни был загружен ПК. «Максимум» - 20 ходов заметно быстрее, чем шли бы медленно.
     widget.set_speed("slow")
-    QTest.qWait(1200)
-    slow = widget.ai.moves
+    QTest.qWait(1500)
+    assert widget.ai.moves <= 3
     widget.new_game()
     widget.set_speed("max")
-    QTest.qWait(1200)
-    assert widget.ai.moves > 3 * max(slow, 1)
+    started = time.time()
+    assert wait_until(qapp, lambda: widget.ai.moves >= 20 or widget.ai.over(), timeout=30)
+    assert time.time() - started < 20 * 0.74 / 2
 
 
 # --- «Соревнование» -------------------------------------------------------------------

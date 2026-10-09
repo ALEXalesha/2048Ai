@@ -5,7 +5,22 @@
 params() -> [(имя, массив, градиент)] - по этому списку работает Adam и сохранение.
 """
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
+
+
+_WINDOWS = {}
+
+
+def _window_index(H, W):
+    """Номера клеток поля с паддингом (H+2)x(W+2), из которых собирается окно 3x3 каждой
+    клетки: (H*W*9,). Раньше окна резались sliding_window_view с np.pad - в поиске, где
+    поле 8x8 и пачки маленькие, это занимало две трети времени."""
+    key = (H, W)
+    idx = _WINDOWS.get(key)
+    if idx is None:
+        y, x, i, j = np.meshgrid(np.arange(H), np.arange(W), np.arange(3), np.arange(3), indexing="ij")
+        idx = ((y + i) * (W + 2) + (x + j)).reshape(-1)
+        _WINDOWS[key] = idx
+    return idx
 
 
 def _he(rng, fan_in, shape, dtype):
@@ -24,10 +39,11 @@ class Conv3x3:
 
     def forward(self, x):
         B, H, W, C = x.shape
-        xp = np.pad(x, ((0, 0), (1, 1), (1, 1), (0, 0)))
-        # (B, H, W, C, 3, 3) -> (B, H, W, 3, 3, C): порядок как у весов (3, 3, C, cout)
-        win = sliding_window_view(xp, (3, 3), axis=(1, 2)).transpose(0, 1, 2, 4, 5, 3)
-        self.cols = win.reshape(B * H * W, 9 * C)
+        xp = np.zeros((B, H + 2, W + 2, C), x.dtype)
+        xp[:, 1:-1, 1:-1] = x
+        # окно 3x3 каждой клетки одним индексом по плоскому полю с паддингом; порядок
+        # (клетка, i, j, канал) - как у весов (3, 3, C, cout)
+        self.cols = xp.reshape(B, (H + 2) * (W + 2), C)[:, _window_index(H, W)].reshape(B * H * W, 9 * C)
         self.shape = x.shape
         y = self.cols @ self.W.reshape(9 * C, -1) + self.b
         return y.reshape(B, H, W, -1)

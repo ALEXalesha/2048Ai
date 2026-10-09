@@ -78,7 +78,7 @@ def host_schema():
             "volume": (70, settings.int_range(0, 100))}
 
 
-WINDOW_OPTS = {"width": 1180, "height": 780, "minWidth": 900, "minHeight": 640}
+WINDOW_OPTS = {"width": 1180, "height": 780, "minWidth": 900, "minHeight": 700}
 
 
 def make_window(game_info, create_widget, app_name, root=None):
