@@ -70,6 +70,8 @@ GROUPS = {
             ("game/train/td.py", "    delta = np.asarray(target, dtype=np.float64) - net.value_of_features(feats)",
              "    delta = np.asarray(target, dtype=np.float64) + net.value_of_features(feats)",
              "TD-ошибка с неверным знаком"),
+            ("game/ai/ntuple.py", "                if should_stop is not None and should_stop():",
+             "                if False:", "загрузку модели не прервать"),
         ],
     },
     "expectimax": {

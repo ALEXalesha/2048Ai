@@ -112,3 +112,22 @@ def test_raw_snapshot_round_trip(tmp_path):
     net.save_raw(tmp_path / "w.npy")
     back = NTupleNet.load_raw(tmp_path / "w.npy", ntuple.TUPLES_4)
     assert (back.w == net.w).all()
+
+
+def test_loading_can_be_cancelled_midway(tmp_path):
+    # Закрытие окна не ждёт, пока догрузится модель в сотни мегабайт: загрузка
+    # прерывается между кусками.
+    net = NTupleNet(ntuple.TUPLES_6)
+    net.w[::1001] = 3.0
+    path = tmp_path / "m.npz"
+    net.export(path)
+    calls = []
+
+    def stop():
+        calls.append(1)
+        return len(calls) > 3
+
+    with pytest.raises(ntuple.LoadCancelled):
+        NTupleNet.load(path, should_stop=stop)
+    back = NTupleNet.load(path, should_stop=lambda: False)
+    assert np.allclose(back.w, net.w, atol=3.0 / 32767)

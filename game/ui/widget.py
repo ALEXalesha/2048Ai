@@ -15,14 +15,13 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import (QCheckBox, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QSlider,
                                QStackedWidget, QVBoxLayout, QWidget)
 
 from aikit import settings as kit_settings
 from aikit import theme as kit_theme
 from aikit.i18n import Translator
-from aikit.widgets import Combo, button, card, label, restyle, segmented
+from aikit.widgets import Combo, button, card, fit_segments, label, regrid, restyle, segmented
 from game.ai import levels
 from game.core.records import Records
 from game.core.session import Session
@@ -54,34 +53,6 @@ def schema():
         "thoughts": (True, kit_settings.boolean()),
         "size": (4, kit_settings.choice(*SIZES)),
     }
-
-
-def fit_segments(*groups):
-    """Кнопки-переключатели шире жирного текста: выбранная кнопка пишется жирным, и
-    ширина, посчитанная по обычному шрифту, обрезала бы её надпись."""
-    for group in groups:
-        for b in group.values():
-            # Шрифт - как в теме (14px), жирный с запасом: у кнопки при постройке ещё
-            # шрифт по умолчанию, тема применяется позже.
-            f = QFont(b.font())
-            f.setPixelSize(max(14, f.pixelSize()))
-            f.setWeight(QFont.Weight.Bold)
-            need = QFontMetrics(f).horizontalAdvance(b.text()) + 30
-            b.setMinimumWidth(need)
-
-
-def regrid(box, buttons, columns):
-    """Переложить кнопки переключателя в сетку: в боковую панель ряд из четырёх не влезает.
-    Старая раскладка уходит во временный виджет и удаляется вместе с ним."""
-    old = box.layout()
-    for b in buttons.values():
-        old.removeWidget(b)                # кнопки остаются детьми box
-    QWidget().setLayout(old)
-    grid = QGridLayout(box)
-    grid.setContentsMargins(0, 0, 0, 0)
-    grid.setSpacing(6)
-    for i, b in enumerate(buttons.values()):
-        grid.addWidget(b, i // columns, i % columns)
 
 
 def fmt_int(n):

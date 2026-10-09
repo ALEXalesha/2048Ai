@@ -103,3 +103,30 @@ def test_combo_has_rounded_corners_and_a_drawn_arrow(qapp, name):
                   for x in range(g.right() - 26, g.right()) for y in range(g.y() + 2, g.bottom()))
     assert darkest >= min(QColor(p["surface2"]).lightness(), text.lightness()) - 25
     host.close()
+
+
+def test_fit_segments_leaves_room_for_bold_text(qapp):
+    from PySide6.QtGui import QFont, QFontMetrics
+
+    from aikit.widgets import fit_segments, segmented
+    _, buttons = segmented({"a": "Соревнование", "b": "ИИ"}, lambda v: None)
+    fit_segments(buttons)
+    for b in buttons.values():
+        f = QFont(b.font())
+        f.setPixelSize(14)
+        f.setWeight(QFont.Weight.Bold)
+        assert b.minimumWidth() >= QFontMetrics(f).horizontalAdvance(b.text()) + 20
+
+
+def test_regrid_keeps_buttons_alive_and_exclusive(qapp):
+    from PySide6.QtWidgets import QGridLayout
+
+    from aikit.widgets import regrid, segmented
+    chosen = []
+    box, buttons = segmented({k: k for k in "abcd"}, chosen.append)
+    regrid(box, buttons, columns=2)
+    assert isinstance(box.layout(), QGridLayout)
+    assert box.layout().getItemPosition(box.layout().indexOf(buttons["c"]))[:2] == (1, 0)
+    buttons["a"].click()
+    buttons["d"].click()
+    assert chosen == ["a", "d"] and buttons["d"].isChecked() and not buttons["a"].isChecked()

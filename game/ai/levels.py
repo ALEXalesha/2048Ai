@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 
 import numpy as np
 
@@ -66,6 +67,8 @@ class Brain:
     def __init__(self, extra_dirs=()):
         self.extra = tuple(extra_dirs)
         self._nets = {}
+        # Взводится, когда окно закрывается: недогруженная модель бросается (LoadCancelled).
+        self.stop_event = threading.Event()
 
     def available(self, level="strong"):
         return find_model(LEVEL_SETTINGS[level]["model"], self.extra) is not None
@@ -76,7 +79,7 @@ class Brain:
             path = find_model(name, self.extra)
             if path is None:
                 raise FileNotFoundError(name)
-            self._nets[name] = NTupleNet.load(path)
+            self._nets[name] = NTupleNet.load(path, should_stop=self.stop_event.is_set)
         return self._nets[name]
 
     def values(self, board, level="strong", depth=None, time_limit=None):

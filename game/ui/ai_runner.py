@@ -96,6 +96,9 @@ class AiRunner(QObject):
         self.answered.emit(job, result)
 
     def stop(self, timeout_ms=2000):
+        event = getattr(self.brain, "stop_event", None)
+        if event is not None:
+            event.set()                      # прервать загрузку модели, если она идёт
         self.cancel()
         self.thread.quit()
         return self.thread.wait(timeout_ms)

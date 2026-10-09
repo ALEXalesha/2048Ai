@@ -14,6 +14,8 @@
 """
 from __future__ import annotations
 
+import zipfile
+
 import numpy as np
 
 from game.core.game2048 import transpose
@@ -27,6 +29,14 @@ TUPLES_6 = (
     (0, 1, 2, 4, 5, 6),
     (4, 5, 6, 8, 9, 10),
 )
+
+# Сколько весов распаковывать за раз при загрузке модели (между кусками можно прерваться).
+LOAD_STEP = 1 << 22
+
+
+class LoadCancelled(Exception):
+    """Загрузку модели прервали: окно закрывается."""
+
 
 # Маленькая сеть для быстрых тестов: строки и квадраты 2x2.
 TUPLES_4 = (
@@ -161,17 +171,33 @@ class NTupleNet:
                             meta=np.array(repr(meta or {})))
 
     @classmethod
-    def load(cls, path):
-        """Модель из export(): веса обратно во float32."""
+    def load(cls, path, should_stop=None):
+        """Модель из export(): веса обратно во float32.
+
+        Таблицы весят сотни мегабайт, распаковка идёт кусками по LOAD_STEP весов. Между
+        кусками спрашивается should_stop(): если окно закрывают, загрузка прерывается
+        исключением LoadCancelled, и поток ИИ останавливается вовремя."""
         with np.load(path) as z:
             lengths = z["tuple_lengths"]
             flat = z["tuple_cells"]
-            tuples, k = [], 0
-            for n in lengths:
-                tuples.append(tuple(int(c) for c in flat[k:k + n]))
-                k += n
-            net = cls(tuples)
-            q = z["q"]
-            for off, size, scale in zip(net.offsets, net.sizes, z["scales"]):
-                net.w[off:off + size] = q[off:off + size].astype(np.float32) * np.float32(scale)
+            scales = z["scales"]
+        tuples, k = [], 0
+        for n in lengths:
+            tuples.append(tuple(int(c) for c in flat[k:k + n]))
+            k += n
+        net = cls(tuples)
+        scale_of = np.repeat(np.asarray(scales, dtype=np.float32), net.sizes)
+        with zipfile.ZipFile(path) as zf, zf.open("q.npy") as fp:
+            version = np.lib.format.read_magic(fp)
+            read_header = (np.lib.format.read_array_header_1_0 if version == (1, 0)
+                           else np.lib.format.read_array_header_2_0)
+            shape, _, dtype = read_header(fp)
+            total = int(np.prod(shape))
+            itemsize = np.dtype(dtype).itemsize
+            for lo in range(0, total, LOAD_STEP):
+                if should_stop is not None and should_stop():
+                    raise LoadCancelled(str(path))
+                n = min(LOAD_STEP, total - lo)
+                part = np.frombuffer(fp.read(n * itemsize), dtype=dtype)
+                net.w[lo:lo + n] = part.astype(np.float32) * scale_of[lo:lo + n]
         return net

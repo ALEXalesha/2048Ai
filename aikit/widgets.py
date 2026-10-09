@@ -10,8 +10,9 @@
   рисует Combo.paintEvent: треугольник из рамок QSS Qt не умеет, выходит прямоугольник.
 """
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QPainter, QPolygonF
-from PySide6.QtWidgets import QButtonGroup, QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPolygonF
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
+                               QPushButton, QWidget)
 
 
 class Combo(QComboBox):
@@ -89,3 +90,32 @@ def restyle(widget, object_name):
     widget.setObjectName(object_name)
     widget.style().unpolish(widget)
     widget.style().polish(widget)
+
+
+def fit_segments(*groups):
+    """Кнопки-переключатели шире жирного текста: выбранная кнопка пишется жирным, и
+    ширина, посчитанная по обычному шрифту, обрезала бы её надпись (2048Ai, 03.10).
+    Звать после каждой смены надписей (язык). groups - словари {значение: кнопка}."""
+    for group in groups:
+        for b in group.values():
+            # Шрифт - как в теме (14px), жирный с запасом: у кнопки при постройке ещё
+            # шрифт по умолчанию, тема применяется позже.
+            f = QFont(b.font())
+            f.setPixelSize(max(14, f.pixelSize()))
+            f.setWeight(QFont.Weight.Bold)
+            need = QFontMetrics(f).horizontalAdvance(b.text()) + 30
+            b.setMinimumWidth(need)
+
+
+def regrid(box, buttons, columns):
+    """Переложить кнопки переключателя в сетку: в боковую панель ряд из четырёх не влезает.
+    Старая раскладка уходит во временный виджет и удаляется вместе с ним."""
+    old = box.layout()
+    for b in buttons.values():
+        old.removeWidget(b)                # кнопки остаются детьми box
+    QWidget().setLayout(old)
+    grid = QGridLayout(box)
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setSpacing(6)
+    for i, b in enumerate(buttons.values()):
+        grid.addWidget(b, i // columns, i % columns)
