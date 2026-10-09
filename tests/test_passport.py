@@ -79,3 +79,28 @@ def test_parallel_passport_gives_the_same_games_as_one_process():
     many = pp.play_parallel("corner", 6, processes=2, echo=None)
     for k in ("score", "max_exp", "moves"):
         assert (np.asarray(one[k]) == np.asarray(many[k])).all()
+
+
+def test_passport_resumes_chunk_by_chunk(tmp_path):
+    """Прерванный прогон не теряет готовые куски: они лежат файлами и берутся снова."""
+    parts = tmp_path / "parts"
+    first = pp.play_parallel("corner", 6, processes=1, echo=None, parts_dir=str(parts),
+                             chunk=2, limit_chunks=1)
+    assert first is None                                   # прогон не доделан
+    files = sorted(parts.glob("corner-*.npz"))
+    assert len(files) == 1
+    stamp = files[0].stat().st_mtime_ns
+    done = pp.play_parallel("corner", 6, processes=2, echo=None, parts_dir=str(parts), chunk=2)
+    assert files[0].stat().st_mtime_ns == stamp            # готовый кусок не пересчитан
+    assert len(list(parts.glob("corner-*.npz"))) == 3
+    one = bots.play(bots.corner_policy(), 6, pp.SEED)
+    for k in ("score", "max_exp", "moves"):
+        assert (np.asarray(one[k]) == np.asarray(done[k])).all()
+
+
+def test_parts_of_another_model_are_not_reused(tmp_path, monkeypatch):
+    parts = tmp_path / "parts"
+    pp.play_parallel("corner", 2, processes=1, echo=None, parts_dir=str(parts), chunk=2)
+    monkeypatch.setattr(pp, "fingerprint", lambda name: "другая-модель")
+    pp.play_parallel("corner", 2, processes=1, echo=None, parts_dir=str(parts), chunk=2)
+    assert len(list(parts.glob("corner-*.npz"))) == 2

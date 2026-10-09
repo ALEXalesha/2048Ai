@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import platform
@@ -25,6 +26,9 @@ SAMPLE = {"random": 50, "corner": 50, "novice": 20, "medium": 20, "strong": 2}
 # Сильный уровень с поиском в 19 раз медленнее сети без поиска: его партии делятся между
 # несколькими процессами, каждый в один поток и с пониженным приоритетом.
 HEAVY = ("strong",)
+# По столько партий в куске сильного уровня: пачка побольше быстрее считается, а прерывание
+# теряет не больше одного куска на процесс.
+PART_GAMES = 25
 
 
 def _chunk(job):
@@ -39,18 +43,77 @@ def _chunk(job):
     return lo, res
 
 
-def play_parallel(name, games, processes, echo=print):
-    from concurrent.futures import ProcessPoolExecutor
-    size = max(1, -(-games // (processes * 4)))
-    jobs = [(name, lo, min(games, lo + size)) for lo in range(0, games, size)]
+FIELDS = ("score", "max_exp", "moves")
+
+
+def fingerprint(name):
+    """Чем играл кусок: модель уровня (её содержимое), настройки уровня и зерно. Куски
+    другой модели в новый паспорт не берутся."""
+    h = hashlib.sha1(f"{name}|{SEED}".encode())
+    s = LEVEL_SETTINGS.get(name)
+    if s:
+        h.update(json.dumps(s, sort_keys=True).encode())
+        path = levels.find_model(s["model"])
+        if path:
+            with open(path, "rb") as f:
+                for block in iter(lambda: f.read(1 << 20), b""):
+                    h.update(block)
+    return h.hexdigest()[:12]
+
+
+def _part_path(parts_dir, name, lo, hi, key):
+    return os.path.join(parts_dir, f"{name}-{key}-{lo:05d}-{hi:05d}.npz")
+
+
+def _save_part(path, res):
+    tmp = path + ".tmp.npz"
+    np.savez(tmp, seconds=np.array(res["seconds"]), **{k: np.asarray(res[k]) for k in FIELDS})
+    os.replace(tmp, path)
+
+
+def _load_part(path):
+    with np.load(path) as z:
+        out = {k: z[k] for k in FIELDS}
+        out["seconds"] = float(z["seconds"])
+    return out
+
+
+def play_parallel(name, games, processes, echo=print, parts_dir=None, chunk=None, limit_chunks=None):
+    """Партии игрока кусками в нескольких процессах. С parts_dir каждый готовый кусок сразу
+    ложится файлом, и прерванный прогон продолжается с недостающих. limit_chunks - досчитать
+    не больше стольких кусков (для проверки продолжения). Возвращает None, если не всё готово."""
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    size = chunk or max(1, -(-games // (processes * 4)))
+    spans = [(lo, min(games, lo + size)) for lo in range(0, games, size)]
+    key = fingerprint(name)
     parts = {}
-    with ProcessPoolExecutor(max_workers=processes) as pool:
-        for lo, res in pool.map(_chunk, jobs):
-            parts[lo] = res
-            if echo:
-                echo(f"  {name}: готово {sum(len(r['score']) for r in parts.values())} из {games}")
+    todo = []
+    for lo, hi in spans:
+        path = _part_path(parts_dir, name, lo, hi, key) if parts_dir else None
+        if path and os.path.exists(path):
+            parts[lo] = _load_part(path)
+        else:
+            todo.append((lo, hi, path))
+    if parts and echo:
+        echo(f"  {name}: из прошлых прогонов {sum(len(r['score']) for r in parts.values())} из {games}")
+    if limit_chunks is not None:
+        todo = todo[:limit_chunks]
+    if parts_dir:
+        os.makedirs(parts_dir, exist_ok=True)
+    if todo:
+        with ProcessPoolExecutor(max_workers=processes) as pool:
+            futures = {pool.submit(_chunk, (name, lo, hi)): path for lo, hi, path in todo}
+            for fut in as_completed(futures):
+                lo, res = fut.result()
+                parts[lo] = res
+                if futures[fut]:
+                    _save_part(futures[fut], res)
+                if echo:
+                    echo(f"  {name}: готово {sum(len(r['score']) for r in parts.values())} из {games}")
+    if len(parts) < len(spans):
+        return None
     keys = sorted(parts)
-    out = {k: np.concatenate([parts[lo][k] for lo in keys]) for k in ("score", "max_exp", "moves")}
+    out = {k: np.concatenate([parts[lo][k] for lo in keys]) for k in FIELDS}
     out["seconds"] = sum(parts[lo]["seconds"] for lo in keys)
     return out
 
@@ -63,7 +126,7 @@ def players(brain):
     return out
 
 
-def evaluate(name, policy, games, echo=print, processes=1):
+def evaluate(name, policy, games, echo=print, processes=1, parts_dir=None):
     started = time.time()
     last = [0.0]
 
@@ -72,8 +135,10 @@ def evaluate(name, policy, games, echo=print, processes=1):
             last[0] = time.time()
             echo(f"  {name}: партии {lo}-{hi}, идут {alive}, ход {steps}, {time.time() - started:.0f} с")
 
-    if processes > 1 and name in HEAVY:
-        res = play_parallel(name, games, processes, echo)
+    if name in HEAVY:
+        res = play_parallel(name, games, processes, echo, parts_dir=parts_dir, chunk=PART_GAMES)
+        if res is None:
+            raise RuntimeError(f"{name}: не все куски готовы")
     else:
         res = bots.play(policy, games, SEED, progress=progress)
     s = bots.summary(res)
@@ -97,7 +162,8 @@ def training_info(run_dir):
     }
 
 
-def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None, processes=1):
+def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None, processes=1,
+          parts_dir=None):
     passport = {}
     if os.path.exists(out_path):
         with open(out_path, encoding="utf-8") as f:
@@ -118,7 +184,7 @@ def build(out_path, run_dir=None, games=1000, only=None, echo=print, extra=None,
         if name in passport["results"]:
             continue
         echo(f"{name}: {games} партий...")
-        passport["results"][name] = evaluate(name, make(), games, echo, processes)
+        passport["results"][name] = evaluate(name, make(), games, echo, processes, parts_dir)
         r = passport["results"][name]
         echo(f"{name}: средний {r['avg_score']:.0f}, 2048 {100 * r['reached']['2048']:.1f}%, "
              f"{r['seconds']:.0f} с")
