@@ -41,7 +41,20 @@ never the seed or the random generator; a test guards that.
 
 ## Model passport
 
-Passport numbers (1000 games per level) will be added after the full run of the strong level.
+1000 games per player, game i has its own seed; tests replay the first games with the same
+seeds and compare scores exactly. File: `game/models/passport.json`.
+
+| Player | Average | Best | 2048 | 4096 | 8192 | 16384 |
+|---|---:|---:|---:|---:|---:|---:|
+| Random moves | 1,102 | 3,484 | 0 % | 0 % | 0 % | 0 % |
+| "Big tiles in the corner" | 2,541 | 7,348 | 0 % | 0 % | 0 % | 0 % |
+| Novice (snapshot after 1000 games) | 13,290 | 33,804 | 6.2 % | 0 % | 0 % | 0 % |
+| Medium (network, no search) | 134,593 | 287,660 | 98.4 % | 94.6 % | 73.8 % | 1.7 % |
+| Strong (network + expectimax) | 194,571 | 374,352 | 99.9 % | 99.5 % | 97.6 % | 25.1 % |
+
+**Training:** 500,000 self-play games, 2.27 billion moves, 5.2 hours on one thread
+(Ryzen 7 5700X). Learning rate 0.1 for the first 202k games, then 0.01. The model is 29 MB
+(int16 npz).
 
 ## Run from source
 

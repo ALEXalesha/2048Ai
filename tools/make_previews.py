@@ -48,7 +48,9 @@ def wait(app, cond, timeout=TIMEOUT):
 def shot(app, window, name):
     for b in (window.game.me_board, window.game.ai_board):
         b.finish_animation()
-    pump(app, 0.2)
+    # Раскладка боковой панели досчитывается не сразу: с короткой паузой на кадре подписи
+    # «Мыслей ИИ» налезали на компас (10.10).
+    pump(app, 1.0)
     path = os.path.join(ROOT, "docs", f"{name}.png")
     window.grab().save(path)
     print(path)

@@ -144,6 +144,10 @@ def evaluate(name, policy, games, echo=print, processes=1, parts_dir=None):
     s = bots.summary(res)
     s["seconds"] = round(time.time() - started, 1)
     s["processes"] = processes if name in HEAVY else 1
+    if name in HEAVY:
+        # Время в процессах по всем кускам, включая прошлые прерванные запуски: стенные
+        # часы последнего запуска показали бы только остаток.
+        s["process_seconds"] = round(float(res["seconds"]), 1)
     s["seed"] = SEED
     s["first_scores"] = [int(x) for x in res["score"][:SAMPLE.get(name, 10)]]
     s["max_tile_counts"] = {str(1 << int(e)): int((res["max_exp"] == e).sum())

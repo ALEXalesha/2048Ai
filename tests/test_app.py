@@ -416,3 +416,38 @@ def test_statistics_page_has_no_stale_labels_after_language_switch(widget, ctx, 
     texts = [lab.text() for lab in box.findChildren(QLabel) if lab.isVisibleTo(box)]
     assert "Games" not in texts and texts.count("Партий") == 1
     assert len(texts) == widget.stats_grid.count()
+
+
+def test_thoughts_panel_widgets_do_not_overlap(qapp):
+    """Кадр README 10.10: подписи оценок налезали на компас - боковая панель сжималась."""
+    window, c = aikit.make_window(GAME_INFO, lambda cx: GameWidget(cx, brain=FakeBrain()), APP_NAME)
+    window.resize(1280, 720)
+    window.show()
+    g_ = window.game
+    g_.start_mode("play")
+    g_.hint()
+    assert wait_until(qapp, lambda: g_.me_board.hint_dir is not None)
+    qapp.processEvents()
+    order = [g_.thoughts_box, g_.compass, g_.values_label, g_.expected_label]
+    rects = [w.geometry() for w in order if w.isVisible()]
+    for a, b in zip(rects, rects[1:]):
+        assert a.bottom() < b.top(), (a, b)
+    assert g_.compass.height() >= g_.compass.minimumHeight() == 170
+    window.close()
+
+
+def test_numbers_are_rounded_not_truncated():
+    from game.ui.widget import fmt_int
+    assert fmt_int(1101.82) == "1 102"
+    assert fmt_int(194570.848) == "194 571"
+    assert fmt_int(0) == "0"
+
+
+def test_versus_does_not_drop_a_key_while_the_ai_tile_slides(widget, qapp):
+    """Кадр README 10.10: быстрые нажатия в соревновании терялись, пока ехали плитки ИИ."""
+    widget.start_mode("versus")
+    for _ in range(3):
+        d = next(d for d in range(4) if widget.me.game.legal(d))
+        assert widget.human_move(d)
+        assert wait_until(qapp, lambda: not widget.runner.busy() and widget.ai.moves == widget.me.moves)
+        widget.me_board.finish_animation()

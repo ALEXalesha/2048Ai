@@ -56,7 +56,7 @@ def schema():
 
 
 def fmt_int(n):
-    return f"{int(n):,}".replace(",", " ")
+    return f"{int(round(n)):,}".replace(",", " ")
 
 
 class GameWidget(QWidget):
@@ -473,8 +473,12 @@ class GameWidget(QWidget):
     def human_move(self, direction):
         if self.me is None or self.me.over() or self._closing:
             return False
-        if self.mode == "versus" and (self.runner.busy() or self.ai_board.animating()):
-            return False                      # ИИ ещё не сделал свой ответный ход
+        if self.mode == "versus":
+            if self.runner.busy():
+                return False                  # ИИ ещё не сделал свой ответный ход
+            # Ход ИИ уже сделан, только плитки ещё едут: досмотреть их сразу, а нажатие
+            # не терять (быстрые нажатия пропадали).
+            self.ai_board.finish_animation()
         res = self.me.move(direction)
         if not res.moved:
             return False
