@@ -57,9 +57,11 @@ def test_trim_removes_only_what_the_game_does_not_need(tmp_path):
 
 
 def test_publish_script_takes_private_strings_from_git_not_from_the_file():
-    text = open(os.path.join(ROOT, "tools", "publish_github.sh"), encoding="utf-8").read()
-    assert 'PRIVATE_EMAIL="$(git config user.email)"' in text
-    assert "git remote get-url origin" in text
-    assert "REPO=ALEXalesha/2048Ai" in text
-    assert "--force" in text                       # первая публикация заменяет начальный коммит
-    assert "@gmail" not in text and "192.168." not in text
+    # Выкладка - общий PythonAiGames/tools/publish_game.sh: почту и адрес Gitea он берёт из
+    # git config и origin. Здесь только обёртка и настройки - и личного в них нет.
+    wrap = open(os.path.join(ROOT, "tools", "publish_github.sh"), encoding="utf-8").read()
+    conf = open(os.path.join(ROOT, "tools", "publish.conf"), encoding="utf-8").read()
+    assert "PythonAiGames/tools/publish_game.sh" in wrap
+    assert "REPO=ALEXalesha/2048Ai" in conf
+    for text in (wrap, conf):
+        assert "@gmail" not in text and "192.168." not in text
