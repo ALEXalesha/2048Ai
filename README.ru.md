@@ -5,6 +5,9 @@ PyTorch и без pygame. English: [README.md](README.md).
 
 ![Играет ИИ](docs/preview_ai.png)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Код, тесты и документация этого проекта написаны Claude (Anthropic) в Claude Code. Идеи, проверка и решения - Алексей.
+
 ## Что внутри
 
 - **Играю сам.** Обычная 2048: стрелки, WASD или смахивание мышью по полю. «Отменить ход»

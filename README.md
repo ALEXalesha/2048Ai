@@ -5,6 +5,9 @@ numpy - no PyTorch, no pygame. Русская версия: [README.ru.md](READM
 
 ![The AI plays](docs/preview_ai.png)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Code, tests and docs are written by Claude (Anthropic) in Claude Code. Ideas, testing and decisions - Alexey.
+
 ## Features
 
 - **I play.** Classic 2048 with arrow keys, WASD or a mouse swipe. *Undo* restores the board
