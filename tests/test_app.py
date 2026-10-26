@@ -426,14 +426,31 @@ def test_thoughts_panel_widgets_do_not_overlap(qapp):
     g_ = window.game
     g_.start_mode("play")
     g_.hint()
-    assert wait_until(qapp, lambda: g_.me_board.hint_dir is not None)
-    qapp.processEvents()
-    order = [g_.thoughts_box, g_.compass, g_.values_label, g_.expected_label]
-    rects = [w.geometry() for w in order if w.isVisible()]
-    for a, b in zip(rects, rects[1:]):
-        assert a.bottom() < b.top(), (a, b)
-    assert g_.compass.height() >= g_.compass.minimumHeight() == 170
-    window.close()
+    try:
+        assert wait_until(qapp, lambda: g_.me_board.hint_dir is not None)
+        order = [g_.thoughts_box, g_.compass, g_.values_label, g_.expected_label]
+
+        def snapshot():
+            return [w.geometry().getRect() for w in order if w.isVisible()]
+
+        # Подпись оценок получает текст вместе с подсказкой, и раскладка внутри QScrollArea
+        # доходит до места за два прохода цикла событий: после первого у подписи уже новая
+        # высота, но ещё старое место. Сколько проходов успело пройти внутри wait_until,
+        # зависит от того, когда пришёл ответ, - поэтому ждём, пока места перестанут меняться.
+        prev, rects = None, snapshot()
+        for _ in range(50):
+            if rects == prev:
+                break
+            qapp.processEvents()
+            prev, rects = rects, snapshot()
+        for a, b in zip(rects, rects[1:]):
+            assert a[1] + a[3] <= b[1], (a, b)
+        assert g_.compass.height() >= g_.compass.minimumHeight() == 170
+    finally:
+        # Окно с живым потоком ИИ, брошенное упавшей проверкой, сборщик мусора убивает
+        # позже, посреди чужого теста: «QThread: Destroyed while thread is still running»
+        # роняет весь прогон без итога pytest.
+        window.close()
 
 
 def test_numbers_are_rounded_not_truncated():
