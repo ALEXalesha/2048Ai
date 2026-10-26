@@ -4,10 +4,12 @@
 import os
 import re
 import subprocess
+import sys
 
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PUBLIC_HOSTS = ("github.com", "gitlab.com", "codeberg.org")
 
 
 def git(*args):
@@ -32,7 +34,9 @@ def secrets():
                 found.append(surname)
     remote = git("remote", "get-url", "origin")
     m = re.match(r"^[a-z]+://([^/]+)/", remote)
-    if m:
+    # домашний сервер - личное; github.com в клоне с GitHub - нет (на него ссылаются
+    # значки README), так же, как в DurakAi
+    if m and not m.group(1).split(":")[0].lower().endswith(PUBLIC_HOSTS):
         found.append(m.group(1))
         found.append(m.group(1).split(":")[0])
     found.append("Drive" + "\\" + "Alexey")
@@ -63,3 +67,18 @@ def test_no_private_strings_in_tracked_files():
             if s in text:
                 bad.append((os.path.relpath(path, ROOT), "…" + s[-3:]))
     assert not bad, f"личное в файлах: {bad}"
+
+
+def test_public_origin_is_not_a_secret(monkeypatch):
+    """В клоне с GitHub origin - github.com, а он законно есть в README:
+    проверка не должна краснеть на CI GitHub."""
+    real = git
+
+    def fake(*args):
+        if args[0] == "remote":
+            return "https://github.com/someone/2048Ai.git"
+        if args[0] == "config":
+            return ""
+        return real(*args)
+    monkeypatch.setattr(sys.modules[__name__], "git", fake)
+    test_no_private_strings_in_tracked_files()
